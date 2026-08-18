@@ -4,10 +4,20 @@ import base64
 import csv
 import io
 import os
+import re
 import tempfile
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
+
+# Must run before any "import matplotlib.pyplot" (all deferred, inside methods
+# below) — chart generation happens off the main thread via asyncio.to_thread,
+# and matplotlib's default GUI backend (TkAgg on Windows) requires the main
+# thread. Agg is a headless, thread-safe raster backend, which is all we need
+# to render charts to PNG for the PDF report.
+import matplotlib
+
+matplotlib.use("Agg")
 
 from sqlalchemy import select
 
@@ -247,16 +257,35 @@ class ReportService:
             "CoverTitle",
             parent=styles["Title"],
             fontSize=22,
+            leading=27,
             spaceAfter=18,
             alignment=TA_CENTER,
+        )
+        subtitle_style = ParagraphStyle(
+            "CoverSubtitle",
+            parent=styles["Normal"],
+            fontSize=11,
+            leading=14,
+            textColor=colors.HexColor("#64748b"),
+            alignment=TA_CENTER,
+        )
+        score_label_style = ParagraphStyle(
+            "ScoreLabel",
+            parent=styles["Normal"],
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor("#64748b"),
+            alignment=TA_CENTER,
+            spaceAfter=2,
         )
         score_style = ParagraphStyle(
             "CoverScore",
             parent=styles["Title"],
             fontSize=42,
+            leading=50,
             textColor=colors.HexColor("#0284c7"),
             alignment=TA_CENTER,
-            spaceAfter=12,
+            spaceAfter=16,
         )
         heading_style = ParagraphStyle(
             "SectionHeading",
@@ -271,6 +300,17 @@ class ReportService:
             parent=styles["Normal"],
             fontSize=9,
             leading=12,
+        )
+        body_spaced_style = ParagraphStyle(
+            "BodySpaced",
+            parent=body_style,
+            spaceAfter=8,
+        )
+        url_heading_style = ParagraphStyle(
+            "UrlHeading",
+            parent=body_style,
+            spaceBefore=10,
+            spaceAfter=6,
         )
         small_style = ParagraphStyle(
             "Small",
@@ -293,9 +333,19 @@ class ReportService:
         overall = report["overall_score"]
         overall_display = f"{overall:.0f}" if isinstance(overall, (int, float)) else "--"
 
-        story.append(Spacer(1, 1.8 * inch))
+        score_text = (
+            f'{overall_display}<font size="18" color="#94a3b8"> / 100</font>'
+            if isinstance(overall, (int, float))
+            else overall_display
+        )
+
+        story.append(Spacer(1, 1.5 * inch))
         story.append(Paragraph(safe(domain), title_style))
-        story.append(Paragraph(overall_display, score_style))
+        story.append(Paragraph("SEO Audit Report", subtitle_style))
+        story.append(Spacer(1, 0.4 * inch))
+        story.append(Paragraph("OVERALL SCORE", score_label_style))
+        story.append(Paragraph(score_text, score_style))
+        story.append(Spacer(1, 0.15 * inch))
         story.append(
             Paragraph(
                 f"Generated {datetime.utcnow().isoformat()} · Crawl date: {safe(report.get('crawl_date') or 'N/A')}",
@@ -374,7 +424,7 @@ class ReportService:
             story.append(Spacer(1, 0.2 * inch))
             story.append(Image(chart_paths["category_scores"], width=6.5 * inch, height=2.4 * inch))
         if chart_paths.get("severity"):
-            story.append(Spacer(1, 0.15 * inch))
+            story.append(Paragraph("Issues by Severity", heading_style))
             story.append(Image(chart_paths["severity"], width=6.5 * inch, height=2.4 * inch))
 
         story.append(Paragraph("Prioritized Recommendations", heading_style))
@@ -400,7 +450,7 @@ class ReportService:
             Paragraph(
                 "One row per site-level finding (robots, sitemap, cross-page, homepage). "
                 "These are not repeated under individual pages.",
-                body_style,
+                body_spaced_style,
             )
         )
         site_issues = report.get("site_issues") or []
@@ -450,7 +500,7 @@ class ReportService:
         story.append(
             Paragraph(
                 "Findings from page_issues, grouped by URL. Only that page's rows are listed.",
-                body_style,
+                body_spaced_style,
             )
         )
         page_groups = report.get("page_issues") or []
@@ -461,7 +511,7 @@ class ReportService:
                 url = safe(group.get("url") or "—")
                 count = group.get("issue_count") or len(group.get("issues") or [])
                 story.append(
-                    Paragraph(f"<b>{url}</b> — {count} finding(s)", body_style)
+                    Paragraph(f"<b>{url}</b> — {count} finding(s)", url_heading_style)
                 )
                 rows = [["Severity", "Rule", "Message"]]
                 for issue in (group.get("issues") or [])[:80]:
@@ -537,10 +587,11 @@ class ReportService:
         return paths
 
     def _chart_to_temp_png(self, plt: Any, labels: list[str], values: list[Any], title: str) -> str:
-        fig, ax = plt.subplots(figsize=(8, 3.2))
+        fig, ax = plt.subplots(figsize=(8, 3.4))
         ax.bar([self._labelize(str(label)) for label in labels], values, color="#0284c7")
         ax.set_title(title)
         ax.grid(axis="y", linestyle="--", alpha=0.3)
+        plt.setp(ax.get_xticklabels(), rotation=30, ha="right", fontsize=8)
         fig.tight_layout()
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
         temp_file.close()
@@ -662,7 +713,8 @@ class ReportService:
         return self._labelize(category)[:31]
 
     def _labelize(self, value: str) -> str:
-        return value.replace("_", " ").title()
+        label = value.replace("_", " ").title()
+        return re.sub(r"\bAi\b", "AI", label)
 
     def _pdf_template(self) -> str:
         return """

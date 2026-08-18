@@ -66,7 +66,7 @@ export default function NewAuditPage() {
   const { selectAudit } = useAuditSelection();
 
   const [startUrl, setStartUrl] = useState("");
-  const [maxPages, setMaxPages] = useState(50);
+  const [maxPages, setMaxPages] = useState<number | "">(50);
   const [enablePagespeed, setEnablePagespeed] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -291,7 +291,11 @@ export default function NewAuditPage() {
       return;
     }
 
-    const max = Math.floor(maxPages) || 1;
+    if (maxPages === "") {
+      setError("Enter the number of pages to crawl.");
+      return;
+    }
+    const max = Math.floor(maxPages);
     if (max > 5000) {
       setError("Maximum allowed pages is 5,000. Please enter 5,000 or fewer.");
       return;
@@ -339,6 +343,7 @@ export default function NewAuditPage() {
     showPhaseBar && phaseTot ? Math.min(100, (phaseCur / phaseTot) * 100) : 0;
 
   const busy = submitting || polling;
+  const maxPagesInvalid = maxPages === "" || maxPages < 1 || maxPages > 5000;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -392,17 +397,29 @@ export default function NewAuditPage() {
                 min={1}
                 max={5000}
                 className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition ${
-                  maxPages > 5000
+                  maxPagesInvalid
                     ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
                     : "border-gray-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                 }`}
                 value={maxPages}
-                onChange={(e) => setMaxPages(Number(e.target.value))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setMaxPages(raw === "" ? "" : Number(raw));
+                }}
                 disabled={busy}
+                required
               />
-              {maxPages > 5000 ? (
+              {maxPages === "" ? (
+                <p className="text-xs font-semibold text-red-600">
+                  Enter the number of pages to crawl.
+                </p>
+              ) : maxPages > 5000 ? (
                 <p className="text-xs font-semibold text-red-600">
                   Maximum allowed pages is 5,000.
+                </p>
+              ) : maxPages < 1 ? (
+                <p className="text-xs font-semibold text-red-600">
+                  Max pages must be at least 1.
                 </p>
               ) : (
                 <p className="text-xs text-gray-500">
@@ -433,7 +450,7 @@ export default function NewAuditPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="submit"
-                disabled={busy}
+                disabled={busy || maxPagesInvalid}
                 className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-60"
               >
                 {polling ? "Auditing…" : submitting ? "Starting…" : "Start audit"}
