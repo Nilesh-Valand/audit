@@ -10,6 +10,8 @@ from sqlalchemy.orm import joinedload
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
+from app.ai_content.analyzer import analyze_text
+from app.ai_content.suggestions import generate_suggestions
 from app.crawler.storage import CrawlStorage
 from app.db.database import SessionLocal
 from app.models import CrawledPage, CrawlRun, CrawlRunScore, PageIssue
@@ -168,6 +170,82 @@ class CrawledPageListResponse(BaseModel):
     page: int
     page_size: int
     items: list[CrawledPageListItemResponse]
+
+
+class AiPatternResponse(BaseModel):
+    pattern: str
+    severity: str
+    score: float
+    examples: list[str] = []
+
+
+class AiSentenceScoreResponse(BaseModel):
+    index: int
+    text: str
+    ai_likelihood: float
+
+
+class AiSuggestionResponse(BaseModel):
+    detected_sentence: str | None = None
+    issue: str
+    suggestion: str
+    improved_direction: str | None = None
+
+
+class AiContentScanResponse(BaseModel):
+    page_id: int
+    url: str
+    word_count: int
+    overall_pct: float
+    confidence: str
+    detected_patterns: list[AiPatternResponse] = []
+    sentence_scores: list[AiSentenceScoreResponse] = []
+    highlighted_phrases: list[str] = []
+    suggestions: list[AiSuggestionResponse] = []
+
+
+class SinglePageDetailResponse(BaseModel):
+    id: int
+    crawl_id: int
+    url: str
+    raw_url: str | None = None
+    status_code: int | None = None
+    title: str | None = None
+    meta_description: str | None = None
+    canonical_url: str | None = None
+    meta_robots: str | None = None
+    h1: str | None = None
+    h1_list: list[str] | None = None
+    word_count: int | None = None
+    response_time_ms: float | None = None
+    redirect_hops: int = 0
+    is_indexable: bool = True
+    has_schema: bool = False
+    js_rendered: bool = False
+
+    # Technical & Social
+    og_title: str | None = None
+    og_description: str | None = None
+    og_image: str | None = None
+    twitter_card: str | None = None
+    twitter_title: str | None = None
+    html_lang: str | None = None
+    favicon_present: bool = False
+    url_length: int = 0
+    url_has_uppercase: bool = False
+    url_has_underscore: bool = False
+    url_has_query_params: bool = False
+    resource_request_count: int | None = None
+    render_blocking_scripts_in_head: int = 0
+    stylesheets_in_head: int = 0
+    images_count: int = 0
+    schema_count: int = 0
+
+    # Issues on this page
+    issues: list[AuditIssueResponse] = []
+
+    # AI Content Scan
+    ai_content_scan: AiContentScanResponse | None = None
 
 
 class ReportIssueResponse(BaseModel):
@@ -693,6 +771,141 @@ async def get_crawl_run_pages(
                 for crawled_page in pages
             ],
         )
+
+
+def _run_ai_content_scan(crawled_page: CrawledPage) -> AiContentScanResponse:
+    text_parts = []
+    if crawled_page.title:
+        text_parts.append(crawled_page.title)
+    if crawled_page.meta_description:
+        text_parts.append(crawled_page.meta_description)
+    if crawled_page.h1:
+        text_parts.append(crawled_page.h1)
+
+    text_to_analyze = ". ".join(text_parts)
+    if not text_to_analyze.strip():
+        text_to_analyze = crawled_page.url
+
+    result = analyze_text(text_to_analyze)
+    suggs = generate_suggestions(
+        result["sentence_scores"],
+        result["detected_patterns"],
+        use_llm=bool(os.environ.get("GROQ_API_KEY")),
+    )
+
+    return AiContentScanResponse(
+        page_id=crawled_page.id,
+        url=crawled_page.url,
+        word_count=crawled_page.word_count or len(text_to_analyze.split()),
+        overall_pct=result["overall_pct"],
+        confidence=result["confidence"],
+        detected_patterns=[AiPatternResponse(**p) for p in result["detected_patterns"]],
+        sentence_scores=[AiSentenceScoreResponse(**s) for s in result["sentence_scores"]],
+        highlighted_phrases=result["highlighted_phrases"],
+        suggestions=[AiSuggestionResponse(**s) for s in suggs],
+    )
+
+
+@router.get("/{crawl_run_id}/pages/{page_id}", response_model=SinglePageDetailResponse)
+async def get_crawl_run_page_detail(crawl_run_id: int, page_id: int) -> SinglePageDetailResponse:
+    _require_crawl_run(crawl_run_id)
+
+    with SessionLocal() as db:
+        crawled_page = db.scalar(
+            select(CrawledPage)
+            .where(CrawledPage.crawl_id == crawl_run_id, CrawledPage.id == page_id)
+            .options(joinedload(CrawledPage.technical_details))
+        )
+        if crawled_page is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Page {page_id} not found in crawl run {crawl_run_id}.",
+            )
+
+        rules_by_id = {rule.id: rule for rule in rule_engine.rules}
+        page_issues_views = [
+            v for v in load_issue_views(db, crawl_run_id, rules_by_id=rules_by_id)
+            if v.url == crawled_page.url
+        ]
+
+        issues_resp = [
+            AuditIssueResponse(
+                id=view.id,
+                rule_id=view.check_name,
+                category=view.category,
+                severity=view.severity,
+                target_url=view.url,
+                message=view.details,
+            )
+            for view in page_issues_views
+        ]
+
+        tech = crawled_page.technical_details
+        images_count = len(tech.images_json) if tech and isinstance(tech.images_json, list) else 0
+        schema_count = len(tech.schema_json) if tech and isinstance(tech.schema_json, list) else 0
+
+        h1_list_val = (
+            crawled_page.h1_list
+            if isinstance(crawled_page.h1_list, list)
+            else ([crawled_page.h1] if crawled_page.h1 else None)
+        )
+
+        ai_scan = _run_ai_content_scan(crawled_page)
+
+        return SinglePageDetailResponse(
+            id=crawled_page.id,
+            crawl_id=crawled_page.crawl_id,
+            url=crawled_page.url,
+            raw_url=crawled_page.raw_url,
+            status_code=crawled_page.status_code,
+            title=crawled_page.title,
+            meta_description=crawled_page.meta_description,
+            canonical_url=crawled_page.canonical_url,
+            meta_robots=crawled_page.meta_robots,
+            h1=crawled_page.h1,
+            h1_list=h1_list_val,
+            word_count=crawled_page.word_count,
+            response_time_ms=crawled_page.response_time_ms,
+            redirect_hops=crawled_page.redirect_hops,
+            is_indexable=crawled_page.is_indexable,
+            has_schema=crawled_page.has_schema,
+            js_rendered=crawled_page.js_rendered,
+            
+            og_title=tech.og_title if tech else None,
+            og_description=tech.og_description if tech else None,
+            og_image=tech.og_image if tech else None,
+            twitter_card=tech.twitter_card if tech else None,
+            twitter_title=tech.twitter_title if tech else None,
+            html_lang=tech.html_lang if tech else None,
+            favicon_present=tech.favicon_present if tech else False,
+            url_length=tech.url_length if tech else len(crawled_page.url),
+            url_has_uppercase=tech.url_has_uppercase if tech else False,
+            url_has_underscore=tech.url_has_underscore if tech else False,
+            url_has_query_params=tech.url_has_query_params if tech else False,
+            resource_request_count=tech.resource_request_count if tech else None,
+            render_blocking_scripts_in_head=tech.render_blocking_scripts_in_head if tech else 0,
+            stylesheets_in_head=tech.stylesheets_in_head if tech else 0,
+            images_count=images_count,
+            schema_count=schema_count,
+            
+            issues=issues_resp,
+            ai_content_scan=ai_scan,
+        )
+
+
+@router.post("/{crawl_run_id}/pages/{page_id}/ai-scan", response_model=AiContentScanResponse)
+async def scan_page_ai_content(crawl_run_id: int, page_id: int) -> AiContentScanResponse:
+    _require_crawl_run(crawl_run_id)
+    with SessionLocal() as db:
+        crawled_page = db.scalar(
+            select(CrawledPage).where(CrawledPage.crawl_id == crawl_run_id, CrawledPage.id == page_id)
+        )
+        if crawled_page is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Page {page_id} not found in crawl run {crawl_run_id}.",
+            )
+        return _run_ai_content_scan(crawled_page)
 
 
 @router.get("/{crawl_run_id}/scores", response_model=ScoreListResponse)

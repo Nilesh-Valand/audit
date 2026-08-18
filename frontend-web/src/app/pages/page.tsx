@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { PageShell, PaginationBar } from "@/components/PageShell";
+import { PageDetailDrawer } from "@/components/PageDetailDrawer";
 import { apiClient, type CrawledPage, type CrawlRunProgress } from "@/lib/api";
 import { useAuditSelection } from "@/lib/AuditSelectionContext";
 import { ApiError, formatBackendError, shouldLinkToSettings } from "@/lib/errors";
@@ -17,6 +18,7 @@ type SortOrder = "asc" | "desc";
 
 export default function PagesPage() {
   const { crawlRunId, ready, selectAudit, clearSelection } = useAuditSelection();
+  const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -243,9 +245,13 @@ export default function PagesPage() {
                 </thead>
                 <tbody>
                   {items.map((pageRow) => (
-                    <tr key={pageRow.id} className="border-b border-gray-50 hover:bg-gray-50/80">
+                    <tr
+                      key={pageRow.id}
+                      onClick={() => setSelectedPageId(pageRow.id)}
+                      className="border-b border-gray-50 hover:bg-brand-50/40 cursor-pointer transition"
+                    >
                       <td className="max-w-xl px-6 py-3">
-                        <div className="truncate font-medium text-gray-900" title={pageRow.title ?? undefined}>
+                        <div className="truncate font-medium text-gray-900 group-hover:text-brand-700" title={pageRow.title ?? undefined}>
                           {pageRow.title || "Untitled"}
                         </div>
                         <div className="truncate text-xs text-gray-500" title={pageRow.url}>
@@ -275,6 +281,14 @@ export default function PagesPage() {
           <PaginationBar page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
         </CardContent>
       </Card>
+
+      {crawlRunId && (
+        <PageDetailDrawer
+          crawlRunId={crawlRunId}
+          pageId={selectedPageId}
+          onClose={() => setSelectedPageId(null)}
+        />
+      )}
     </PageShell>
   );
 }

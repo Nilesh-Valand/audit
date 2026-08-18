@@ -103,6 +103,79 @@ export type CrawledPage = {
   issue_count: number;
 };
 
+export type AiPattern = {
+  pattern: string;
+  severity: "Low" | "Medium" | "High";
+  score: number;
+  examples: string[];
+};
+
+export type AiSentenceScore = {
+  index: number;
+  text: string;
+  ai_likelihood: number;
+};
+
+export type AiSuggestion = {
+  detected_sentence?: string | null;
+  issue: string;
+  suggestion: string;
+  improved_direction?: string | null;
+};
+
+export type AiContentScan = {
+  page_id: number;
+  url: string;
+  word_count: number;
+  overall_pct: number;
+  confidence: "Low" | "Medium" | "High";
+  detected_patterns: AiPattern[];
+  sentence_scores: AiSentenceScore[];
+  highlighted_phrases: string[];
+  suggestions: AiSuggestion[];
+};
+
+export type SinglePageDetail = {
+  id: number;
+  crawl_id: number;
+  url: string;
+  raw_url?: string | null;
+  status_code?: number | null;
+  title?: string | null;
+  meta_description?: string | null;
+  canonical_url?: string | null;
+  meta_robots?: string | null;
+  h1?: string | null;
+  h1_list?: string[] | null;
+  word_count?: number | null;
+  response_time_ms?: number | null;
+  redirect_hops: number;
+  is_indexable: boolean;
+  has_schema: boolean;
+  js_rendered: boolean;
+
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image?: string | null;
+  twitter_card?: string | null;
+  twitter_title?: string | null;
+  html_lang?: string | null;
+  favicon_present: boolean;
+  url_length: number;
+  url_has_uppercase: boolean;
+  url_has_underscore: boolean;
+  url_has_query_params: boolean;
+  resource_request_count?: number | null;
+  render_blocking_scripts_in_head: number;
+  stylesheets_in_head: number;
+  images_count: number;
+  schema_count: number;
+
+  issues: AuditIssue[];
+
+  ai_content_scan?: AiContentScan | null;
+};
+
 export type AuditReport = {
   project: { id: number; domain: string | null };
   crawl_date: string | null;
@@ -440,6 +513,10 @@ export const apiClient = {
    * Server-side HTML fetch for Current Page Check.
    * Requires FastAPI `POST /api/page-html` (not implemented yet — see page contract).
    */
+  getPageDetail: (crawlRunId: number, pageId: number) =>
+    api.get<SinglePageDetail>(`/api/crawl-runs/${crawlRunId}/pages/${pageId}`),
+  scanPageAiContent: (crawlRunId: number, pageId: number) =>
+    api.post<AiContentScan>(`/api/crawl-runs/${crawlRunId}/pages/${pageId}/ai-scan`),
   fetchPageHtml: (url: string) =>
     api.post<PageHtmlResponse>(
       "/api/page-html",
