@@ -1,0 +1,283 @@
+- id: missing_title
+  category: technical
+  description: Page is missing a title tag.
+  severity: high
+  condition: missing_title
+- id: duplicate_title
+  category: technical
+  description: Title is duplicated across multiple pages.
+  severity: medium
+  condition: duplicate_title
+- id: missing_meta_description
+  category: technical
+  description: Page is missing a meta description.
+  severity: medium
+  condition: missing_meta_description
+- id: duplicate_meta_description
+  category: technical
+  description: Meta description is duplicated across multiple pages.
+  severity: low
+  condition: duplicate_meta_description
+- id: broken_link
+  category: technical
+  description: Page returned a 4xx or 5xx response.
+  severity: high
+  condition: broken_link
+- id: redirect_chain
+  category: technical
+  description: URL required 3 or more redirects before resolving.
+  severity: medium
+  condition: redirect_chain
+- id: canonical_noindex_conflict
+  category: technical
+  description: Page sets a canonical URL while also using noindex.
+  severity: high
+  condition: canonical_noindex_conflict
+- id: missing_canonical
+  category: technical
+  description: Page is missing a link rel=canonical tag.
+  severity: medium
+  condition: missing_canonical
+- id: self_canonical_mismatch
+  category: technical
+  description: Canonical URL does not match the page's own normalized URL (excluding common pagination patterns).
+  severity: medium
+  condition: self_canonical_mismatch
+- id: broken_canonical_url
+  category: technical
+  description: Canonical URL is malformed or resolves to a 4xx/5xx response.
+  severity: high
+  condition: broken_canonical_url
+- id: canonical_points_to_redirect
+  category: technical
+  description: Canonical URL returns a 3xx redirect instead of resolving directly.
+  severity: high
+  condition: canonical_points_to_redirect
+- id: canonical_points_to_noindex
+  category: technical
+  description: Canonical target page includes a meta robots noindex directive.
+  severity: high
+  condition: canonical_points_to_noindex
+- id: orphan_page
+  category: technical
+  description: Page has no inbound internal links from other crawled pages.
+  severity: medium
+  condition: orphan_page
+- id: missing_h1
+  category: technical
+  description: Page is missing an H1 heading.
+  severity: medium
+  condition: missing_h1
+- id: multiple_h1
+  category: technical
+  description: Page contains multiple H1 headings.
+  severity: low
+  condition: multiple_h1
+- id: lcp_fail
+  category: performance
+  description: Largest Contentful Paint is slower than recommended.
+  severity: high
+  condition: lcp_fail
+- id: inp_fail
+  category: performance
+  description: Interaction to Next Paint or fallback Total Blocking Time is too high.
+  severity: high
+  condition: inp_fail
+- id: cls_fail
+  category: performance
+  description: Cumulative Layout Shift is higher than recommended.
+  severity: medium
+  condition: cls_fail
+- id: large_page_weight
+  category: performance
+  description: Total measured page weight exceeds 3MB.
+  severity: high
+  condition: large_page_weight
+- id: excessive_requests
+  category: performance
+  description: Page references more than 100 subresources.
+  severity: medium
+  condition: excessive_requests
+- id: render_blocking_resources
+  category: performance
+  description: Render-blocking scripts in head or too many blocking stylesheets.
+  severity: medium
+  condition: render_blocking_resources
+- id: oversized_images
+  category: performance
+  description: Image file size is large relative to declared display size (>200KB).
+  severity: medium
+  condition: oversized_images
+- id: missing_image_dimensions
+  category: performance
+  description: Image tags are missing width and/or height attributes.
+  severity: medium
+  condition: missing_image_dimensions
+- id: outdated_image_format
+  category: performance
+  description: Images use jpg/png where modern formats (webp/avif) would be better.
+  severity: low
+  condition: outdated_image_format
+- id: slow_ttfb
+  category: performance
+  description: Server response time (TTFB proxy) exceeds 800ms.
+  severity: high
+  condition: slow_ttfb
+- id: thin_content
+  category: content
+  description: Page has thin visible content.
+  severity: medium
+  condition: thin_content
+- id: duplicate_content
+  category: content
+  description: Page content appears duplicated across multiple URLs.
+  severity: high
+  condition: duplicate_content
+- id: missing_schema
+  category: structured_data
+  description: Page type likely needs schema but none was found.
+  severity: medium
+  condition: missing_schema
+- id: mixed_content
+  category: security
+  description: HTTPS page references insecure HTTP resources.
+  severity: critical
+  condition: mixed_content
+- id: sitemap_orphan
+  category: indexing
+  description: Sitemap lists URLs that were not covered by this crawl.
+  severity: medium
+  condition: sitemap_orphan
+- id: crawled_not_in_sitemap
+  category: indexing
+  description: Crawled URL does not appear in the sitemap.
+  severity: low
+  condition: crawled_not_in_sitemap
+
+# --- Crawlability (Phase 8 data) ---
+- id: uppercase_url
+  category: crawlability
+  description: URL contains uppercase letters.
+  severity: low
+  condition: uppercase_url
+- id: underscore_in_url
+  category: crawlability
+  description: URL path uses underscores instead of hyphens.
+  severity: low
+  condition: underscore_in_url
+- id: excessive_url_length
+  category: crawlability
+  description: URL is longer than 115 characters.
+  severity: medium
+  condition: excessive_url_length
+- id: unnecessary_url_parameters
+  category: crawlability
+  description: Canonical-worthy page URL includes session or tracking parameters.
+  severity: medium
+  condition: unnecessary_url_parameters
+- id: redirect_loop
+  category: crawlability
+  description: Redirect chain returns to a previously seen URL.
+  severity: high
+  condition: redirect_loop
+- id: temp_redirect_should_be_permanent
+  category: crawlability
+  description: A 302 redirect is reused consistently and should likely be a 301.
+  severity: medium
+  condition: temp_redirect_should_be_permanent
+- id: robots_txt_syntax_error
+  category: crawlability
+  description: robots.txt was found but has syntax problems.
+  severity: medium
+  condition: robots_txt_syntax_error
+- id: robots_txt_missing
+  category: crawlability
+  description: No robots.txt was found at the site root.
+  severity: low
+  condition: robots_txt_missing
+- id: sitemap_not_found
+  category: crawlability
+  description: /sitemap.xml returned 404 or was otherwise unavailable.
+  severity: medium
+  condition: sitemap_not_found
+- id: sitemap_malformed
+  category: crawlability
+  description: Sitemap XML could not be parsed.
+  severity: high
+  condition: sitemap_malformed
+- id: sitemap_child_broken
+  category: crawlability
+  description: A child sitemap referenced by a sitemap index is missing or malformed.
+  severity: high
+  condition: sitemap_child_broken
+
+# --- AI Readiness (distinct from traditional SEO) ---
+- id: ai_crawler_blocked
+  category: ai_readiness
+  description: One or more AI crawler user-agents are disallowed in robots.txt.
+  severity: low
+  condition: ai_crawler_blocked
+- id: llms_txt_missing
+  category: ai_readiness
+  description: No llms.txt was found at the site root (emerging convention).
+  severity: low
+  condition: llms_txt_missing
+- id: answer_first_heuristic
+  category: ai_readiness
+  description: First meaningful paragraph after H1 is missing or too short before the first H2.
+  severity: low
+  condition: answer_first_heuristic
+
+# --- On-page ---
+- id: missing_og_tags
+  category: on_page
+  description: Open Graph tags og:title, og:description, or og:image are missing.
+  severity: medium
+  condition: missing_og_tags
+- id: missing_twitter_card
+  category: on_page
+  description: Twitter card tags are missing.
+  severity: low
+  condition: missing_twitter_card
+- id: missing_html_lang
+  category: on_page
+  description: html lang attribute is missing.
+  severity: medium
+  condition: missing_html_lang
+- id: missing_favicon
+  category: on_page
+  description: No favicon was detected on the homepage.
+  severity: low
+  condition: missing_favicon
+- id: organization_schema
+  category: on_page
+  description: Homepage is missing Organization JSON-LD schema.
+  severity: medium
+  condition: organization_schema
+- id: website_schema
+  category: on_page
+  description: Homepage is missing WebSite JSON-LD schema.
+  severity: medium
+  condition: website_schema
+- id: generic_404_page
+  category: on_page
+  description: Site does not return a proper custom 404 for unknown URLs.
+  severity: medium
+  condition: generic_404_page
+- id: schema_invalid
+  category: on_page
+  description: JSON-LD schema is malformed or missing required fields for its type.
+  severity: medium
+  condition: schema_invalid
+
+# --- Content recommendations ---
+- id: keyword_cannibalization
+  category: content
+  description: Pages have highly similar title/H1 text and may compete for the same intent.
+  severity: medium
+  condition: keyword_cannibalization
+- id: poor_content_structure
+  category: content
+  description: Long-form pages lack H2/H3 subheadings.
+  severity: medium
+  condition: poor_content_structure
