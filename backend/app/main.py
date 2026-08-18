@@ -14,6 +14,7 @@ if sys.platform.startswith("win"):
 
 from app.config import settings
 from app.db.database import init_db
+from app.api.ai_content import router as ai_content_router
 from app.api.crawl_runs import router as crawl_runs_router
 from app.api.health import router as health_router
 from app.api.page_html import router as page_html_router
@@ -85,3 +86,8 @@ app.include_router(health_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(crawl_runs_router, prefix="/api")
 app.include_router(page_html_router, prefix="/api")
+# No "/api" prefix here on purpose — mirrors the standalone AI Content
+# Detection API's exact paths (GET /health, POST /analyze) so anything
+# pointed at that service (localhost:5000) can be repointed at this
+# backend's base URL and keep working unmodified.
+app.include_router(ai_content_router)

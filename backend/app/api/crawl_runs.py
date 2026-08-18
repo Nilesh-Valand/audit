@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from datetime import datetime
 
-import httpx
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import func, select
@@ -15,7 +13,6 @@ from starlette.responses import StreamingResponse
 
 from app.ai_content.analyzer import analyze_text
 from app.ai_content.suggestions import generate_suggestions
-from app.config import settings
 from app.crawler.storage import CrawlStorage
 from app.db.database import SessionLocal
 from app.models import CrawledPage, CrawlRun, CrawlRunScore, PageIssue
@@ -25,7 +22,6 @@ from app.services.deletions import delete_crawl_run
 from app.services.issues import IssueView, count_issues_by_severity, load_issue_views
 from app.services.report import ReportService, iter_file_chunks, remove_file
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/crawl-runs", tags=["crawl-runs"])
 storage = CrawlStorage()
 rule_engine = RuleEngine()
@@ -778,26 +774,6 @@ async def get_crawl_run_pages(
         )
 
 
-def _call_external_ai_content_api(text: str) -> dict | None:
-    """Call the standalone AI Content Detection service. Returns None on any
-    failure (service down, timeout, bad response) so callers can fall back."""
-    try:
-        response = httpx.post(
-            f"{settings.AI_CONTENT_API_URL}/analyze",
-            json={"content": text[:20000], "include_suggestions": True},
-            timeout=10.0,
-        )
-        response.raise_for_status()
-        return response.json()
-    except Exception:
-        logger.warning(
-            "AI content API unreachable at %s; falling back to local analyzer",
-            settings.AI_CONTENT_API_URL,
-            exc_info=True,
-        )
-        return None
-
-
 def _run_ai_content_scan(crawled_page: CrawledPage) -> AiContentScanResponse:
     text_parts = []
     if crawled_page.title:
@@ -811,22 +787,6 @@ def _run_ai_content_scan(crawled_page: CrawledPage) -> AiContentScanResponse:
     if not text_to_analyze.strip():
         text_to_analyze = crawled_page.url
 
-    external = _call_external_ai_content_api(text_to_analyze)
-    if external is not None:
-        overall = external.get("overall") or {}
-        return AiContentScanResponse(
-            page_id=crawled_page.id,
-            url=crawled_page.url,
-            word_count=crawled_page.word_count or len(text_to_analyze.split()),
-            overall_pct=overall.get("ai_writing_likelihood", 0.0),
-            confidence=overall.get("confidence", "Low"),
-            detected_patterns=[AiPatternResponse(**p) for p in external.get("detected_patterns", [])],
-            sentence_scores=[AiSentenceScoreResponse(**s) for s in external.get("sentence_scores", [])],
-            highlighted_phrases=external.get("highlighted_phrases", []),
-            suggestions=[AiSuggestionResponse(**s) for s in external.get("suggestions", [])],
-        )
-
-    # External service unreachable — fall back to the local rule-based analyzer.
     result = analyze_text(text_to_analyze)
     suggs = generate_suggestions(
         result["sentence_scores"],

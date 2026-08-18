@@ -30,7 +30,6 @@ class Settings(BaseSettings):
     ENRICHMENT_PAGESPEED_REQUEST_DELAY: float = 1.0
     ENRICHMENT_PAGESPEED_MAX_RETRIES: int = 3
     PAGESPEED_API_KEY: str | None = None
-    AI_CONTENT_API_URL: str = "http://127.0.0.1:5000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
