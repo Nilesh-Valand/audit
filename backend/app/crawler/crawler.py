@@ -74,6 +74,7 @@ class CrawlerService:
         self.effective_max_depth = max(max_depth, 50 if max_pages >= 100 else max_depth)
         self.concurrency = concurrency or settings.CRAWLER_CONCURRENCY
         self.request_delay = request_delay if request_delay is not None else settings.CRAWLER_REQUEST_DELAY
+        self.max_crawl_delay = settings.CRAWLER_MAX_CRAWL_DELAY
         self.thin_content_threshold = (
             thin_content_threshold
             if thin_content_threshold is not None
@@ -579,6 +580,7 @@ class CrawlerService:
                     crawl_delay = float(raw_delay) if raw_delay is not None else 0.0
                 except (TypeError, ValueError):
                     crawl_delay = 0.0
+                crawl_delay = min(crawl_delay, self.max_crawl_delay)
             effective_delay = max(self.request_delay, crawl_delay)
             if last_request_at is not None:
                 wait_time = effective_delay - (now - last_request_at)

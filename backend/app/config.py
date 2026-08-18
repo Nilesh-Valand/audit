@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     )
     CRAWLER_CONCURRENCY: int = 10
     CRAWLER_REQUEST_DELAY: float = 0.05
+    # Cap how long we'll honor a site's robots.txt Crawl-delay directive. Some
+    # sites specify large values (10s+) that would make big-page-count audits
+    # impractically slow; we still throttle, just not by an unbounded amount.
+    CRAWLER_MAX_CRAWL_DELAY: float = 2.0
     CRAWLER_FLUSH_SIZE: int = 1
     CRAWLER_FLUSH_INTERVAL: float = 0.5
     CRAWLER_THIN_CONTENT_THRESHOLD: int = 200
@@ -26,6 +30,7 @@ class Settings(BaseSettings):
     ENRICHMENT_PAGESPEED_REQUEST_DELAY: float = 1.0
     ENRICHMENT_PAGESPEED_MAX_RETRIES: int = 3
     PAGESPEED_API_KEY: str | None = None
+    AI_CONTENT_API_URL: str = "http://127.0.0.1:5000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
