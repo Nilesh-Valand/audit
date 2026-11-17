@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SEO Audit",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Crawl and audit websites for SEO issues. Dashboard, issues, pages, reports, and a current-page checker.",
   "icons": {
     "16": "icons/icon16.png",
@@ -21,7 +21,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "tabs"],
+  "permissions": ["tabs"],
   "host_permissions": [
     "https://seoaudit.theonetechnologies.co.in/*",
     "http://127.0.0.1:8000/*",
